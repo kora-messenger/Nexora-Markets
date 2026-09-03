@@ -7,6 +7,7 @@ import android.util.Base64
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.nexoratech.markets.BuildConfig
 import com.nexoratech.markets.data.Network
 import com.nexoratech.markets.data.SettingsStore
 import kotlinx.coroutines.Dispatchers
@@ -24,19 +25,28 @@ data class ChartAnalysisRequest(
 )
 
 /**
- * Vision AI chart analysis. Works with any OpenAI-compatible chat API
- * (OpenAI, Groq, OpenRouter, ...) — the user's own key, stored encrypted.
+ * Vision AI chart analysis — two modes, same output contract:
+ *
+ *  - Nexora Cloud (default): the request goes to the Nexora backend on
+ *    Base44, which holds the AI provider key server-side. Nothing
+ *    sensitive ships inside the APK.
+ *  - Own key: calls any OpenAI-compatible chat API (OpenAI, Groq,
+ *    OpenRouter, ...) directly with the user's key, stored encrypted.
+ *
  * Sends up to two chart screenshots (e.g. 4H trend + 15M entry) and gets
  * back a structured trade plan.
  */
 class ChartAiClient(private val settings: SettingsStore) {
 
     suspend fun analyze(request: ChartAnalysisRequest, readBitmap: suspend (Uri) -> Bitmap?): AiAnalysisResult {
-        if (!settings.hasAiKey()) {
-            return AiAnalysisResult.Error("No AI API key set. Add one in Settings (OpenAI, Groq or any OpenAI-compatible provider).")
+        val cloud = settings.useCloud && BuildConfig.NEXORA_API_TOKEN.isNotBlank()
+        if (!cloud && !settings.hasAiKey()) {
+            return AiAnalysisResult.Error("No AI provider configured. Enable Nexora Cloud in Settings, or add your own API key (OpenAI, Groq or any OpenAI-compatible provider).")
         }
         val images = request.imageUris.mapNotNull { readBitmap(it)?.let { b -> encodeForTransport(b) } }
         if (images.isEmpty()) return AiAnalysisResult.Error("Could not read the selected chart image(s).")
+
+        if (cloud) return analyzeViaCloud(request, images)
 
         val prompt = buildPrompt(request)
 
@@ -73,6 +83,54 @@ class ChartAiClient(private val settings: SettingsStore) {
             AiAnalysisResult.Error("AI request failed: ${t.message ?: "unknown error"}")
         }
     }
+
+    /**
+     * Nexora Cloud mode: POST the screenshots to the Base44 backend, which
+     * runs the identical prompt server-side and returns the same JSON
+     * contract ({status, analysis{signal, confidence, entry, ...}}).
+     */
+    private suspend fun analyzeViaCloud(request: ChartAnalysisRequest, images: List<String>): AiAnalysisResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = JsonObject().apply {
+                    addProperty("token", BuildConfig.NEXORA_API_TOKEN)
+                    add("images", JsonArray().apply { images.forEach { add(com.google.gson.JsonPrimitive(it)) } })
+                    addProperty("timeframe", request.timeframe)
+                    addProperty("trading_style", request.tradingStyle)
+                    addProperty("instrument", request.instrumentHint)
+                }
+                val httpRequest = Request.Builder()
+                    .url(BuildConfig.NEXORA_API_URL.trimEnd('/') + "/functions/analyzeChart")
+                    .header("Content-Type", "application/json")
+                    .post(body.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+                Network.http.newCall(httpRequest).execute().use { response ->
+                    val text = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) {
+                        val message = runCatching {
+                            JsonParser.parseString(text).asJsonObject.get("message")?.asString
+                        }.getOrNull() ?: "HTTP ${response.code}"
+                        return@withContext AiAnalysisResult.Error(message)
+                    }
+                    val json = JsonParser.parseString(text).asJsonObject
+                    val analysis = json.getAsJsonObject("analysis")
+                    AiAnalysisResult.Success(
+                        com.nexoratech.markets.data.model.AiAnalysis(
+                            signal = analysis.get("signal")?.asString ?: "NEUTRAL",
+                            confidence = analysis.get("confidence")?.takeIf { it !is com.google.gson.JsonNull }?.asString,
+                            entry = analysis.get("entry")?.takeIf { it !is com.google.gson.JsonNull }?.asString,
+                            stopLoss = analysis.get("stop_loss")?.takeIf { it !is com.google.gson.JsonNull }?.asString,
+                            takeProfits = analysis.get("take_profits")?.asJsonArray?.map { it.asString }.orEmpty(),
+                            keyLevels = analysis.get("key_levels")?.asJsonArray?.map { it.asString }.orEmpty(),
+                            reasoning = analysis.get("reasoning")?.asString.orEmpty(),
+                            raw = null,
+                        )
+                    )
+                }
+            } catch (t: Throwable) {
+                AiAnalysisResult.Error("Cloud request failed: ${t.message ?: "unknown error"}")
+            }
+        }
 
     private suspend fun postChat(body: JsonObject): JsonObject = withContext(Dispatchers.IO) {
         val base = settings.aiBaseUrl.trimEnd('/')

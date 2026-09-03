@@ -41,6 +41,12 @@ class SettingsStore(context: Context) {
         get() = prefs.getStringSet(KEY_FOREX, DEFAULT_FOREX)?.toList() ?: DEFAULT_FOREX.toList()
         set(value) = prefs.edit().putStringSet(KEY_FOREX, value.toSet()).apply()
 
+    /** When true, AI analysis runs on the Nexora Cloud backend (Base44)
+     *  instead of calling the provider directly with the user's own key. */
+    var useCloud: Boolean
+        get() = prefs.getBoolean(KEY_USE_CLOUD, true)
+        set(value) = prefs.edit().putBoolean(KEY_USE_CLOUD, value).apply()
+
     fun hasAiKey(): Boolean = aiApiKey.isNotBlank()
 
     companion object {
@@ -49,6 +55,7 @@ class SettingsStore(context: Context) {
         private const val KEY_AI_MODEL = "ai_model"
         private const val KEY_CRYPTO = "watch_crypto"
         private const val KEY_FOREX = "watch_forex"
+        private const val KEY_USE_CLOUD = "use_cloud"
         private const val DEFAULT_BASE_URL = "https://api.openai.com/v1"
         private const val DEFAULT_MODEL = "gpt-4o-mini"
 

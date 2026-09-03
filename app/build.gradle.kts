@@ -15,6 +15,14 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         vectorDrawables.useSupportLibrary = true
+
+        // Nexora Cloud backend (Base44). The URL is public; the shared API
+        // token is injected at build time from the NEXORA_API_TOKEN repo
+        // secret so it never sits in source control.
+        buildConfigField("String", "NEXORA_API_URL",
+            "\"${project.findProperty("nexoraApiUrl") ?: "https://solene-64311f39.base44.app"}\"")
+        buildConfigField("String", "NEXORA_API_TOKEN",
+            "\"${project.findProperty("nexoraApiToken") ?: ""}\"")
     }
 
     buildTypes {
@@ -37,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

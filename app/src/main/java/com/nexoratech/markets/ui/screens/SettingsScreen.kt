@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -50,6 +51,7 @@ fun SettingsScreen(app: NexoraApp, viewModel: MarketsViewModel, onBack: () -> Un
     var crypto by remember { mutableStateOf(app.settings.cryptoWatchlist) }
     var forex by remember { mutableStateOf(app.settings.forexWatchlist) }
     var savedTick by remember { mutableStateOf(false) }
+    var useCloud by remember { mutableStateOf(app.settings.useCloud) }
 
     Scaffold(
         topBar = {
@@ -80,6 +82,28 @@ fun SettingsScreen(app: NexoraApp, viewModel: MarketsViewModel, onBack: () -> Un
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("AI analysis engine", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Nexora Cloud (recommended)", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                "Runs on the Nexora backend — no key needed on this device",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = useCloud,
+                            onCheckedChange = { value ->
+                                useCloud = value
+                                app.settings.useCloud = value
+                            },
+                        )
+                    }
                     Text("AI provider", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Bring your own key — OpenAI, Groq, OpenRouter or any OpenAI-compatible API. " +
