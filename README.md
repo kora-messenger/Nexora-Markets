@@ -60,3 +60,13 @@ No API keys required for market data. The AI layer requires your own key.
 ---
 
 ⚠️ **Disclaimer:** educational analysis only. Not financial advice — markets carry risk.
+
+## Switching backends / using your own domain
+
+The app talks to the Nexora Cloud backend over HTTPS at a single configurable URL:
+
+- **Android app** — set `nexoraApiUrl` in [`gradle.properties`](gradle.properties) to your domain (or pass `-PnexoraApiUrl=...` at build time) and rebuild. No code changes needed.
+- **Analysis pipeline** — set the `NEXORA_API_URL` repo secret (defaults to the Base44 endpoint).
+- **Server** — the backend functions live in this repo's `functions/` directory as standard Deno scripts. When you get your own domain, host the same functions anywhere Deno runs (or behind any reverse proxy) and point the two URLs above at it. The API contract (`/functions/analyzeChart`, `/functions/saveMarketReport`, `/functions/latestMarketReport`) stays identical.
+
+Base44 is the zero-setup default (HTTPS endpoint, no domain required). Nothing in the app is hard-wired to it.
