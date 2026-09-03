@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Nexora "N" candle mark -->
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M40,30 h6 v48 h-6 z" />
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M62,30 h6 v48 h-6 z" />
+    <path
+        android:fillColor="#5EEAD4"
+        android:pathData="M46,54 L62,34 l6,0 L46,64 z" />
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M54,66 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+</vector>

@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Nexora Markets</string>
+    <string name="company_name">Nexora Technologies</string>
+    <string name="nav_markets">Markets</string>
+    <string name="nav_analyze">Analyze</string>
+    <string name="nav_settings">Settings</string>
+    <string name="disclaimer">Educational analysis only. Not financial advice — always do your own research before trading.</string>
+    <string name="data_attribution">Live data: Binance · Kraken · ECB · Yahoo Finance</string>
+</resources>
