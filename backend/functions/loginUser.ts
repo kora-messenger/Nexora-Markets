@@ -48,6 +48,27 @@ function errorResponse(err: unknown) {
   return Response.json({ status: 'error', message: 'Something went wrong. Please try again.' }, { status: 500 });
 }
 
+
+// ---- Access state (7-day trial -> subscription) ----
+const TRIAL_DAYS = 7;
+function computeAccess(user: any) {
+  const now = Date.now();
+  const subActive = user.subscription_active === true &&
+    (!user.subscription_expires_at || new Date(user.subscription_expires_at).getTime() > now);
+  if (subActive) {
+    return { mode: 'active', daysLeft: null, endsAt: user.subscription_expires_at ?? null };
+  }
+  const trialEnd = new Date(user.created_date).getTime() + TRIAL_DAYS * 86400000;
+  if (now < trialEnd) {
+    return {
+      mode: 'trial',
+      daysLeft: Math.max(1, Math.ceil((trialEnd - now) / 86400000)),
+      endsAt: new Date(trialEnd).toISOString(),
+    };
+  }
+  return { mode: 'expired', daysLeft: 0, endsAt: null };
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
@@ -80,6 +101,7 @@ Deno.serve(async (req) => {
       status: 'ok',
       session: { token: sessionToken, expiresAt },
       user: { email: user.email, displayName: user.display_name ?? user.email.split('@')[0] },
+      access: computeAccess(user),
     });
   } catch (err) {
     return errorResponse(err);

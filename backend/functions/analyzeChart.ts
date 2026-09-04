@@ -8,6 +8,24 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * The prompt and response contract mirror the app's on-device BYO-key mode
  * so both paths produce the identical structured trade plan.
  */
+
+const TRIAL_DAYS = 7;
+function computeAccess(user: any) {
+  const now = Date.now();
+  const subActive = user.subscription_active === true &&
+    (!user.subscription_expires_at || new Date(user.subscription_expires_at).getTime() > now);
+  if (subActive) return { mode: 'active' };
+  const trialEnd = new Date(user.created_date).getTime() + TRIAL_DAYS * 86400000;
+  return now < trialEnd ? { mode: 'trial' } : { mode: 'expired' };
+}
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return bytesToHex(new Uint8Array(digest));
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
@@ -15,17 +33,47 @@ Deno.serve(async (req) => {
       return Response.json({ status: 'error', message: 'POST only' }, { status: 405 });
     }
     const body = await req.json();
-    const { token, images, timeframe, trading_style: tradingStyle, instrument } = body ?? {};
+    const { token, images, timeframe, trading_style: tradingStyle, instrument, sessionToken } = body ?? {};
 
     if (!token) {
       return Response.json({ status: 'error', message: 'token is required' }, { status: 400 });
     }
     const creds = await base44.asServiceRole.entities.ApiCredential.list();
-    const valid = (creds ?? []).some(
-      (c) => c.service === 'nexora' && typeof c.token === 'string' && c.token === token
-    );
-    if (!valid) {
+    const kind = (creds ?? []).find(
+      (c) => typeof c.token === 'string' && c.token === token
+    )?.service ?? null;
+    if (kind !== 'nexora' && kind !== 'nexora-pipeline') {
       return Response.json({ status: 'error', message: 'invalid token' }, { status: 401 });
+    }
+
+    // App calls must ride a live session with active access (7-day trial, then subscription).
+    // The publishing pipeline uses its own service credential and is not user-gated.
+    if (kind === 'nexora') {
+      if (typeof sessionToken !== 'string' || !sessionToken) {
+        return Response.json({ status: 'error', message: 'sessionToken is required' }, { status: 400 });
+      }
+      const tokenHash = await sha256Hex(sessionToken);
+      const sessions = await base44.asServiceRole.entities.UserSession.filter({ token_hash: tokenHash }, undefined, 1);
+      const session = (sessions ?? [])[0];
+      if (!session || new Date(session.expires_at).getTime() < Date.now()) {
+        return Response.json({ status: 'error', message: 'session expired' }, { status: 401 });
+      }
+      const users = await base44.asServiceRole.entities.AppUser.filter({ id: session.user_id }, undefined, 1);
+      const user = (users ?? [])[0];
+      if (!user) {
+        return Response.json({ status: 'error', message: 'account not found' }, { status: 401 });
+      }
+      const access = computeAccess(user);
+      if (access.mode === 'expired') {
+        return Response.json(
+          {
+            status: 'error',
+            needsSubscription: true,
+            message: 'Your 7-day Pro trial has ended. Subscribe to keep using Nexora AI analysis.',
+          },
+          { status: 402 }
+        );
+      }
     }
 
     const imageList = Array.isArray(images) ? images.filter((i) => typeof i === 'string' && i.length > 0) : [];
