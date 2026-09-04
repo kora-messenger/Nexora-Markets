@@ -16,8 +16,13 @@ Deno.serve(async (req) => {
     }
 
     const creds = await base44.asServiceRole.entities.ApiCredential.list();
+    // Written by the ai-market-analysis pipeline, which carries its own
+    // 'nexora-pipeline' service credential. The mobile app never calls this.
     const valid = (creds ?? []).some(
-      (c) => c.service === 'nexora' && typeof c.token === 'string' && c.token === token
+      (c) =>
+        typeof c.token === 'string' &&
+        c.token === token &&
+        (c.service === 'nexora-pipeline' || c.service === 'nexora')
     );
     if (!valid) {
       return Response.json({ status: 'error', message: 'invalid token' }, { status: 401 });
