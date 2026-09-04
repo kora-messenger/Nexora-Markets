@@ -46,6 +46,7 @@ import com.nexoratech.markets.ui.components.SignalChip
 import com.nexoratech.markets.ui.components.SymbolBadge
 import com.nexoratech.markets.ui.components.formatChange
 import com.nexoratech.markets.ui.components.formatPrice
+import com.nexoratech.markets.ui.theme.NexoraNumeric
 import com.nexoratech.markets.ui.theme.Buy400
 import com.nexoratech.markets.ui.theme.Sell400
 
@@ -177,14 +178,13 @@ private fun MarketRow(signal: AssetSignal, onClick: () -> Unit) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         formatPrice(signal.price),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = NexoraNumeric.priceMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         formatChange(signal.change1d),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = NexoraNumeric.change,
                         color = if (signal.change1d >= 0) Buy400 else Sell400,
-                        fontWeight = FontWeight.SemiBold,
                     )
                 }
                 Spacer(Modifier.width(10.dp))

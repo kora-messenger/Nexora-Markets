@@ -4,6 +4,12 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.nexoratech.markets.ui.theme.Buy400
+import com.nexoratech.markets.ui.theme.NexoraNumeric
+import com.nexoratech.markets.ui.theme.Sell400
+import java.util.Locale
+import kotlin.math.absoluteValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -269,6 +275,69 @@ private fun ErrorCard(message: String) {
     }
 }
 
+/** Pull the first price out of a level string like "1.0850 - 1.0870" or "~67,400". */
+private fun parseLevel(level: String): Double? =
+    Regex("[-]?[0-9]+(?:[.,][0-9]+)?").find(level)?.value
+        ?.replace(",", ".")?.toDoubleOrNull()
+
+/**
+ * Proportional risk:reward visualization. Zones scale to the actual parsed
+ * prices: stop -> entry -> furthest take profit. Renders only when all
+ * three parse cleanly; otherwise the plan rows carry the information.
+ */
+@Composable
+private fun RiskRewardBar(entry: String, stopLoss: String, takeProfits: List<String>) {
+    val e = parseLevel(entry) ?: return
+    val sl = parseLevel(stopLoss) ?: return
+    val furthestTp = takeProfits.mapNotNull { parseLevel(it) }.maxOrNull() ?: return
+    val risk = (e - sl).absoluteValue
+    val reward = (furthestTp - e).absoluteValue
+    if (risk <= 0.0 || reward <= 0.0) return
+
+    val buy = furthestTp >= e
+    val rr = reward / risk
+    // Full track = risk + reward, so the bar is always truthful to scale.
+    val riskFraction = (risk / (risk + reward)).toFloat().coerceIn(0.05f, 0.95f)
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("RISK", style = MaterialTheme.typography.labelSmall,
+                color = Sell400, fontWeight = FontWeight.SemiBold)
+            Text("REWARD", style = MaterialTheme.typography.labelSmall,
+                color = Buy400, fontWeight = FontWeight.SemiBold)
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(10.dp),
+        ) {
+            Box(
+                Modifier
+                    .weight(riskFraction)
+                    .fillMaxHeight()
+                    .background(Sell400.copy(alpha = 0.55f), RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp)),
+            )
+            Box(
+                Modifier
+                    .weight(1f - riskFraction)
+                    .fillMaxHeight()
+                    .background(Buy400.copy(alpha = 0.55f), RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
+            )
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("SL $stopLoss", style = NexoraNumeric.score,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                if (buy) "R:R 1 : %.1f".format(rr) else "R:R %.1f : 1".format(rr),
+                style = NexoraNumeric.score, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text("TP $furthestTp", style = NexoraNumeric.score,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @Composable
 private fun AnalysisCard(res: AiAnalysisResult.Success) {
     val a = res.analysis
@@ -304,8 +373,11 @@ private fun AnalysisCard(res: AiAnalysisResult.Success) {
             }
 
             a.entry?.let { PlanRow("Entry zone", it) }
-            a.stopLoss?.let { PlanRow("Stop loss", it) }
+            a.stopLoss?.let { sl -> PlanRow("Stop loss", sl) }
             a.takeProfits.forEachIndexed { i, tp -> PlanRow("TP${i + 1}", tp) }
+            if (a.entry != null && a.stopLoss != null) {
+                RiskRewardBar(a.entry, a.stopLoss, a.takeProfits)
+            }
             if (a.keyLevels.isNotEmpty()) {
                 PlanRow("Key levels", a.keyLevels.joinToString(" · "))
             }
@@ -330,7 +402,7 @@ private fun PlanRow(label: String, value: String) {
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold)
+        Text(value, style = NexoraNumeric.priceMedium,
+            color = MaterialTheme.colorScheme.onSurface)
     }
 }

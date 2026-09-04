@@ -32,6 +32,7 @@ import com.nexoratech.markets.data.model.AssetSignal
 import com.nexoratech.markets.ui.components.ScoreBar
 import com.nexoratech.markets.ui.components.SignalChip
 import com.nexoratech.markets.ui.components.formatPrice
+import com.nexoratech.markets.ui.theme.NexoraNumeric
 import com.nexoratech.markets.ui.components.signalColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,7 +70,7 @@ fun SignalDetailScreen(signal: AssetSignal, onBack: () -> Unit) {
                     Text(signal.name, style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
-                    Text(formatPrice(signal.price), style = MaterialTheme.typography.headlineLarge)
+                    Text(formatPrice(signal.price), style = NexoraNumeric.priceLarge)
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SignalChip(signal.signal)

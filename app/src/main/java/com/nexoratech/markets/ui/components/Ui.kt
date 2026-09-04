@@ -24,6 +24,7 @@ import com.nexoratech.markets.data.model.AssetSignal
 import com.nexoratech.markets.data.model.SignalType
 import com.nexoratech.markets.ui.theme.Buy400
 import com.nexoratech.markets.ui.theme.Neutral400
+import com.nexoratech.markets.ui.theme.NexoraNumeric
 import com.nexoratech.markets.ui.theme.Sell400
 import java.util.Locale
 
@@ -115,9 +116,8 @@ fun ScoreBar(signal: AssetSignal, modifier: Modifier = Modifier) {
             Text("-10", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 "score %+.1f".format(signal.score),
-                style = MaterialTheme.typography.labelSmall,
+                style = NexoraNumeric.score,
                 color = color,
-                fontWeight = FontWeight.SemiBold,
             )
             Text("+10", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
