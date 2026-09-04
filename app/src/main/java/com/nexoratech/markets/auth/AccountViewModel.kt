@@ -118,20 +118,20 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
     }
 
     fun saveProfile(
-        experienceLevel: String,
-        primaryGoal: String,
-        capitalUsd: Double,
+        tradingSessions: String,
+        tradeFrequency: String,
+        holdDuration: String,
+        riskPercent: Double,
         instruments: String,
-        tradingStyle: String,
-        riskTolerance: String,
+        capitalUsd: Double,
         onDone: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             val token = app.accountStore.sessionToken
             when (
                 val result = app.accountService.saveProfile(
-                    token, experienceLevel, primaryGoal, capitalUsd,
-                    instruments, tradingStyle, riskTolerance,
+                    token, tradingSessions, tradeFrequency, holdDuration,
+                    riskPercent, instruments, capitalUsd,
                 )
             ) {
                 is AccountService.ProfileResult.Loaded -> onDone(null)

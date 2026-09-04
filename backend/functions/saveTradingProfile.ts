@@ -2,20 +2,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * saveTradingProfile — upsert the caller's personalization profile.
- * {token, sessionToken, experienceLevel?, primaryGoal?, capitalUsd?,
- *  instruments?, tradingStyle?, riskTolerance?} -> {status:'ok', profile}
- * Identity comes from sessionToken (same session vault as the rest of
- * auth) — never trust a client-supplied user id.
+ * {token, sessionToken, tradingSessions?, tradeFrequency?, holdDuration?,
+ *  riskPercent?, instruments?, capitalUsd?} -> {status:'ok', profile}
+ * Identity comes from sessionToken — never trust a client-supplied user id.
  */
 class AuthError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
 
-const GOALS = ['Consistent monthly income', 'Account growth', 'Funded trader status', 'Retirement savings', 'Quit the 9-to-5'];
-const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+const SESSIONS = ['Asia', 'London', 'New York', 'All sessions'];
+const FREQUENCY = ['1-3 a week', '4-10 a week', '10+ a week'];
+const DURATIONS = ['Minutes', 'Hours', 'Days', 'Weeks'];
 const INSTRUMENTS = ['Forex', 'Crypto', 'Both'];
-const STYLES = ['Scalping', 'Day trading', 'Swing trading', 'Position trading'];
-const RISK = ['Conservative', 'Moderate', 'Aggressive'];
+const RISK_PERCENTS = [0.5, 1, 2, 3];
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -65,19 +64,22 @@ Deno.serve(async (req) => {
     const session = await requireUser(base44, body?.sessionToken);
 
     const patch: Record<string, unknown> = {};
-    const experienceLevel = pickEnum(body?.experienceLevel, LEVELS, 'experienceLevel');
-    const primaryGoal = pickEnum(body?.primaryGoal, GOALS, 'primaryGoal');
+    const tradingSessions = pickEnum(body?.tradingSessions, SESSIONS, 'tradingSessions');
+    const tradeFrequency = pickEnum(body?.tradeFrequency, FREQUENCY, 'tradeFrequency');
+    const holdDuration = pickEnum(body?.holdDuration, DURATIONS, 'holdDuration');
     const instruments = pickEnum(body?.instruments, INSTRUMENTS, 'instruments');
-    const tradingStyle = pickEnum(body?.tradingStyle, STYLES, 'tradingStyle');
-    const riskTolerance = pickEnum(body?.riskTolerance, RISK, 'riskTolerance');
-    if (experienceLevel) patch.experience_level = experienceLevel;
-    if (primaryGoal) patch.primary_goal = primaryGoal;
+    if (tradingSessions) patch.trading_sessions = tradingSessions;
+    if (tradeFrequency) patch.trade_frequency = tradeFrequency;
+    if (holdDuration) patch.hold_duration = holdDuration;
     if (instruments) patch.instruments = instruments;
-    if (tradingStyle) patch.trading_style = tradingStyle;
-    if (riskTolerance) patch.risk_tolerance = riskTolerance;
+    if (body?.riskPercent !== undefined && body?.riskPercent !== null && body?.riskPercent !== '') {
+      const risk = Number(body.riskPercent);
+      if (!RISK_PERCENTS.includes(risk)) throw new AuthError('riskPercent must be one of: 0.5, 1, 2, 3', 400);
+      patch.risk_percent = risk;
+    }
     if (body?.capitalUsd !== undefined && body?.capitalUsd !== null && body?.capitalUsd !== '') {
       const capital = Number(body.capitalUsd);
-      if (!Number.isFinite(capital) || capital < 0) throw new AuthError('capitalUsd must be a positive number', 400);
+      if (!Number.isFinite(capital) || capital <= 0) throw new AuthError('capitalUsd must be a positive number', 400);
       patch.capital_usd = capital;
     }
 
@@ -95,11 +97,11 @@ Deno.serve(async (req) => {
 
 function toProfileDto(record: any) {
   return {
-    experienceLevel: record.experience_level ?? null,
-    primaryGoal: record.primary_goal ?? null,
-    capitalUsd: record.capital_usd ?? null,
+    tradingSessions: record.trading_sessions ?? null,
+    tradeFrequency: record.trade_frequency ?? null,
+    holdDuration: record.hold_duration ?? null,
+    riskPercent: record.risk_percent ?? null,
     instruments: record.instruments ?? null,
-    tradingStyle: record.trading_style ?? null,
-    riskTolerance: record.risk_tolerance ?? null,
+    capitalUsd: record.capital_usd ?? null,
   };
 }

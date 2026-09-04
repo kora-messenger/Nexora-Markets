@@ -45,13 +45,14 @@ import com.nexoratech.markets.ui.theme.Teal400
 import com.nexoratech.markets.ui.theme.TextSecondary
 import java.util.Locale
 
-private data class Step(val prompt: String, val options: List<String>)
+private data class Step(val prompt: String, val hint: String?, val options: List<String>)
 
 /**
- * Post-signup personalization — the same idea as the competitor's
- * questionnaire, rebuilt: one question per screen, terminal aesthetic,
- * answers feed the signal engine (watchlist defaults, plan risk framing)
- * instead of a paywall pitch. Values mirror the backend enums exactly.
+ * Post-signup personalization — FxLens asks experience/goal/routine to
+ * sweeten a paywall. Our set is engine-facing: sessions, hold duration,
+ * frequency, risk %, market, and account size. Every answer is a number
+ * or a schedule the signal engine can size plans against —
+ * risk % x account = dollar risk on every trade plan.
  */
 @Composable
 fun ProfileOnboardingScreen(
@@ -59,47 +60,49 @@ fun ProfileOnboardingScreen(
     onDone: () -> Unit,
 ) {
     val steps = listOf(
-        Step("What's your experience level?", listOf("Beginner", "Intermediate", "Advanced")),
-        Step("What's your primary trading goal?", listOf(
-            "Consistent monthly income",
-            "Account growth",
-            "Funded trader status",
-            "Retirement savings",
-            "Quit the 9-to-5",
-        )),
-        Step("Which markets do you trade?", listOf("Forex", "Crypto", "Both")),
-        Step("What's your trading style?", listOf(
-            "Scalping", "Day trading", "Swing trading", "Position trading",
-        )),
-        Step("How do you handle risk?", listOf("Conservative", "Moderate", "Aggressive")),
+        Step(
+            "Which sessions do you trade?",
+            "Signals are timed to the markets you're actually awake for.",
+            listOf("Asia", "London", "New York", "All sessions"),
+        ),
+        Step(
+            "How long do you usually hold a trade?",
+            "Sets the default analysis mode on every chart you submit.",
+            listOf("Minutes", "Hours", "Days", "Weeks"),
+        ),
+        Step(
+            "How many setups do you take a week?",
+            "Keeps the feed at your pace — no flood, no drought.",
+            listOf("1-3 a week", "4-10 a week", "10+ a week"),
+        ),
+        Step(
+            "Max risk on a single trade?",
+            "We frame every plan around this. Pros risk 1% or less.",
+            listOf("0.5%", "1%", "2%", "3%+"),
+        ),
+        Step(
+            "Where do you want to start?",
+            "You can change your watchlist anytime.",
+            listOf("Forex", "Crypto", "Both"),
+        ),
     )
 
     var step by rememberSaveable { mutableIntStateOf(0) }
-    var experience by rememberSaveable { mutableStateOf<String?>(null) }
-    var goal by rememberSaveable { mutableStateOf<String?>(null) }
+    var sessions by rememberSaveable { mutableStateOf<String?>(null) }
+    var holdDuration by rememberSaveable { mutableStateOf<String?>(null) }
+    var frequency by rememberSaveable { mutableStateOf<String?>(null) }
+    var riskChoice by rememberSaveable { mutableStateOf<String?>(null) }
     var instruments by rememberSaveable { mutableStateOf<String?>(null) }
-    var style by rememberSaveable { mutableStateOf<String?>(null) }
-    var risk by rememberSaveable { mutableStateOf<String?>(null) }
     var capital by rememberSaveable { mutableStateOf("") }
     var busy by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val current = steps[step]
     val selected = when (step) {
-        0 -> experience
-        1 -> goal
-        2 -> instruments
-        3 -> style
-        4 -> risk
-        else -> null
-    }
-
-    fun selectedFor(step: Int): String? = when (step) {
-        0 -> experience
-        1 -> goal
-        2 -> instruments
-        3 -> style
-        4 -> risk
+        0 -> sessions
+        1 -> holdDuration
+        2 -> frequency
+        3 -> riskChoice
+        4 -> instruments
         else -> null
     }
 
@@ -114,7 +117,7 @@ fun ProfileOnboardingScreen(
         Column(Modifier.padding(horizontal = 24.dp)) {
             Spacer(Modifier.height(20.dp))
             Text(
-                text = String.format(Locale.US, "PROFILE  %d/6", step + 1),
+                text = String.format(Locale.US, "SETUP  %d/6", step + 1),
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = NexoraMono,
                 color = Teal400,
@@ -148,10 +151,14 @@ fun ProfileOnboardingScreen(
         ) {
             Spacer(Modifier.height(32.dp))
             Text(
-                text = current.prompt,
+                text = steps[step].prompt,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
+            steps[step].hint?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            }
             Spacer(Modifier.height(24.dp))
 
             if (step == 5) {
@@ -161,17 +168,17 @@ fun ProfileOnboardingScreen(
                     Text(it, color = Sell400, style = MaterialTheme.typography.bodySmall)
                 }
             } else {
-                current.options.forEach { option ->
+                steps[step].options.forEach { option ->
                     OptionRow(
                         label = option,
                         selected = selected == option,
                         onClick = {
                             when (step) {
-                                0 -> experience = option
-                                1 -> goal = option
-                                2 -> instruments = option
-                                3 -> style = option
-                                4 -> risk = option
+                                0 -> sessions = option
+                                1 -> holdDuration = option
+                                2 -> frequency = option
+                                3 -> riskChoice = option
+                                4 -> instruments = option
                             }
                         },
                     )
@@ -211,20 +218,27 @@ fun ProfileOnboardingScreen(
                             selected != null
                         }
                         if (!ready) {
-                            error = if (step == 5) "Enter your trading capital to continue" else null
+                            error = if (step == 5) "Enter your account size to continue" else null
                         } else {
                             error = null
                             if (step < 5) {
                                 step++
                             } else {
                                 busy = true
+                                // "3%+" is display-only; the engine stores 3.
+                                val riskPercent = when (riskChoice) {
+                                    "0.5%" -> 0.5
+                                    "1%" -> 1.0
+                                    "2%" -> 2.0
+                                    else -> 3.0
+                                }
                                 viewModel.saveProfile(
-                                    experienceLevel = selectedFor(0)!!,
-                                    primaryGoal = selectedFor(1)!!,
+                                    tradingSessions = sessions!!,
+                                    tradeFrequency = frequency!!,
+                                    holdDuration = holdDuration!!,
+                                    riskPercent = riskPercent,
+                                    instruments = instruments!!,
                                     capitalUsd = capital.toDouble(),
-                                    instruments = selectedFor(2)!!,
-                                    tradingStyle = selectedFor(3)!!,
-                                    riskTolerance = selectedFor(4)!!,
                                 ) { message ->
                                     busy = false
                                     if (message == null) {
@@ -300,7 +314,7 @@ private fun CapitalField(value: String, onValueChange: (String) -> Unit) {
         ),
         supportingText = {
             Text(
-                "Your sizing context — used to frame risk on every plan.",
+                "Combined with your risk %, this sizes every trade plan.",
                 style = MaterialTheme.typography.labelSmall,
             )
         },

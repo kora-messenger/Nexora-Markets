@@ -110,16 +110,20 @@ class AccountService {
 
 
 data class TradingProfileData(
-    val experienceLevel: String? = null,
-    val primaryGoal: String? = null,
-    val capitalUsd: Double? = null,
+    val tradingSessions: String? = null,
+    val tradeFrequency: String? = null,
+    val holdDuration: String? = null,
+    val riskPercent: Double? = null,
     val instruments: String? = null,
-    val tradingStyle: String? = null,
-    val riskTolerance: String? = null,
+    val capitalUsd: Double? = null,
 ) {
     val isComplete: Boolean
-        get() = experienceLevel != null && primaryGoal != null &&
-            instruments != null && tradingStyle != null && riskTolerance != null
+        get() = tradingSessions != null && tradeFrequency != null && holdDuration != null &&
+            riskPercent != null && instruments != null && capitalUsd != null
+
+    /** Dollar risk per trade — the number the signal engine sizes plans with. */
+    val dollarRiskPerTrade: Double?
+        get() = capitalUsd?.let { cap -> riskPercent?.let { pct -> cap * pct / 100.0 } }
 }
 
 sealed class ProfileResult {
@@ -138,33 +142,33 @@ suspend fun getProfile(sessionToken: String): ProfileResult {
     val profile = response.get("profile")?.takeIf { it.isJsonObject }?.asJsonObject
     return ProfileResult.Loaded(profile?.let { p ->
         TradingProfileData(
-            experienceLevel = p.stringOrNull("experienceLevel"),
-            primaryGoal = p.stringOrNull("primaryGoal"),
-            capitalUsd = p.get("capitalUsd")?.takeIf { !it.isJsonNull }?.asDouble,
+            tradingSessions = p.stringOrNull("tradingSessions"),
+            tradeFrequency = p.stringOrNull("tradeFrequency"),
+            holdDuration = p.stringOrNull("holdDuration"),
+            riskPercent = p.get("riskPercent")?.takeIf { !it.isJsonNull }?.asDouble,
             instruments = p.stringOrNull("instruments"),
-            tradingStyle = p.stringOrNull("tradingStyle"),
-            riskTolerance = p.stringOrNull("riskTolerance"),
+            capitalUsd = p.get("capitalUsd")?.takeIf { !it.isJsonNull }?.asDouble,
         )
     })
 }
 
 suspend fun saveProfile(
     sessionToken: String,
-    experienceLevel: String,
-    primaryGoal: String,
-    capitalUsd: Double,
+    tradingSessions: String,
+    tradeFrequency: String,
+    holdDuration: String,
+    riskPercent: Double,
     instruments: String,
-    tradingStyle: String,
-    riskTolerance: String,
+    capitalUsd: Double,
 ): ProfileResult {
     val payload = buildBody {
         addProperty("sessionToken", sessionToken)
-        addProperty("experienceLevel", experienceLevel)
-        addProperty("primaryGoal", primaryGoal)
-        addProperty("capitalUsd", capitalUsd)
+        addProperty("tradingSessions", tradingSessions)
+        addProperty("tradeFrequency", tradeFrequency)
+        addProperty("holdDuration", holdDuration)
+        addProperty("riskPercent", riskPercent)
         addProperty("instruments", instruments)
-        addProperty("tradingStyle", tradingStyle)
-        addProperty("riskTolerance", riskTolerance)
+        addProperty("capitalUsd", capitalUsd)
     }
     val response = postJson("saveTradingProfile", payload)
         ?: return ProfileResult.Failure("No connection to Nexora Cloud. Try again in a moment.")
