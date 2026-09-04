@@ -42,7 +42,13 @@ import com.nexoratech.markets.ui.MarketsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(app: NexoraApp, viewModel: MarketsViewModel, onBack: () -> Unit) {
+fun SettingsScreen(
+    app: NexoraApp,
+    viewModel: MarketsViewModel,
+    account: com.nexoratech.markets.auth.AccountViewModel,
+    user: com.nexoratech.markets.auth.AccountUser,
+    onBack: () -> Unit,
+) {
     var apiKey by remember { mutableStateOf(app.settings.aiApiKey) }
     var baseUrl by remember { mutableStateOf(app.settings.aiBaseUrl) }
     var model by remember { mutableStateOf(app.settings.aiModel) }
@@ -52,6 +58,8 @@ fun SettingsScreen(app: NexoraApp, viewModel: MarketsViewModel, onBack: () -> Un
     var forex by remember { mutableStateOf(app.settings.forexWatchlist) }
     var savedTick by remember { mutableStateOf(false) }
     var useCloud by remember { mutableStateOf(app.settings.useCloud) }
+
+    var confirmSignOut by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -76,6 +84,38 @@ fun SettingsScreen(app: NexoraApp, viewModel: MarketsViewModel, onBack: () -> Un
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // ── Account ──────────────────────────────────────────────
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Account", style = MaterialTheme.typography.titleMedium)
+                    Column {
+                        Text(user.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        Text(user.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (confirmSignOut) {
+                        Text("Sign out on this device?", style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { confirmSignOut = false }) { Text("Cancel") }
+                            androidx.compose.material3.Button(
+                                onClick = { account.signOut { confirmSignOut = false } },
+                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    containerColor = com.nexoratech.markets.ui.theme.Sell400,
+                                    contentColor = androidx.compose.ui.graphics.Color(0xFF2A0D0D),
+                                ),
+                            ) { Text("Sign out") }
+                        }
+                    } else {
+                        TextButton(onClick = { confirmSignOut = true }) {
+                            Text("Sign out", color = com.nexoratech.markets.ui.theme.Sell400)
+                        }
+                    }
+                }
+            }
+
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

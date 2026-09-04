@@ -26,6 +26,7 @@ import com.nexoratech.markets.ui.theme.Buy400
 import com.nexoratech.markets.ui.theme.Neutral400
 import com.nexoratech.markets.ui.theme.NexoraNumeric
 import com.nexoratech.markets.ui.theme.Sell400
+import com.nexoratech.markets.ui.theme.Teal400
 import java.util.Locale
 
 fun formatPrice(price: Double): String = when {
@@ -121,5 +122,30 @@ fun ScoreBar(signal: AssetSignal, modifier: Modifier = Modifier) {
             )
             Text("+10", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+/** Primary action across all auth + app surfaces. Flat, mono-cased,
+ *  electric teal — no gradients, no elevation games. */
+@Composable
+fun NexoraPrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.material3.Button(
+        onClick = onClick,
+        modifier = modifier.height(52.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = Teal400,
+            contentColor = androidx.compose.ui.graphics.Color(0xFF06231F),
+        ),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
