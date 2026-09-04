@@ -27,6 +27,18 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
     private val _profileComplete = MutableStateFlow<Boolean?>(null)
     val profileComplete: StateFlow<Boolean?> = _profileComplete
 
+    /** The loaded profile (null until fetched) — powers the post-questionnaire payoff. */
+    private val _profile = MutableStateFlow<AccountService.TradingProfileData?>(null)
+    val profile: StateFlow<AccountService.TradingProfileData?> = _profile
+
+    /** Trial/subscription state; null while resolving — the app never blocks on it. */
+    private val _access = MutableStateFlow<AccountService.AccessStateData?>(null)
+    val access: StateFlow<AccountService.AccessStateData?> = _access
+
+    /** True once this device has a pending Pro request in. */
+    private val _subscriptionRequested = MutableStateFlow(false)
+    val subscriptionRequested: StateFlow<Boolean> = _subscriptionRequested
+
     init {
         restoreSession()
     }
@@ -44,6 +56,7 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
                     // Keep the existing token; refresh the profile fields.
                     store.userEmail = result.user.email
                     store.userDisplayName = result.user.displayName
+                    _access.value = result.access
                     _state.value = AuthState.SignedIn(result.user)
                     checkProfile()
                 }
@@ -95,6 +108,7 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
             email = result.user.email,
             displayName = result.user.displayName,
         )
+        _access.value = result.access
         _state.value = AuthState.SignedIn(result.user)
         checkProfile()
     }
@@ -103,8 +117,10 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
         viewModelScope.launch {
             val token = app.accountStore.sessionToken
             when (val result = app.accountService.getProfile(token)) {
-                is AccountService.ProfileResult.Loaded ->
+                is AccountService.ProfileResult.Loaded -> {
+                    _profile.value = result.profile
                     _profileComplete.value = result.profile?.isComplete == true
+                }
                 is AccountService.ProfileResult.Failure ->
                     // Backend unreachable: let the user through rather than
                     // trapping them at a spinner — they can retry from Settings.
@@ -136,6 +152,31 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
             ) {
                 is AccountService.ProfileResult.Loaded -> onDone(null)
                 is AccountService.ProfileResult.Failure -> onDone(result.message)
+            }
+        }
+    }
+
+    /** Ask the backend for the freshest trial/subscription state. */
+    fun refreshAccess() {
+        viewModelScope.launch {
+            val token = app.accountStore.sessionToken
+            when (val result = app.accountService.getAccessState(token)) {
+                is AccountService.AccessResult.Loaded -> _access.value = result.access
+                is AccountService.AccessResult.Failure -> Unit // keep last known state
+            }
+        }
+    }
+
+    /** Submit a Pro access request from the paywall. */
+    fun requestSubscription(onDone: (String?) -> Unit) {
+        viewModelScope.launch {
+            val token = app.accountStore.sessionToken
+            when (val result = app.accountService.requestSubscription(token)) {
+                is AccountService.SubscribeResult.Requested -> {
+                    _subscriptionRequested.value = true
+                    onDone(null)
+                }
+                is AccountService.SubscribeResult.Failure -> onDone(result.message)
             }
         }
     }

@@ -38,7 +38,11 @@ data class ChartAnalysisRequest(
  */
 class ChartAiClient(private val settings: SettingsStore) {
 
-    suspend fun analyze(request: ChartAnalysisRequest, readBitmap: suspend (Uri) -> Bitmap?): AiAnalysisResult {
+    suspend fun analyze(
+        request: ChartAnalysisRequest,
+        sessionToken: String = "",
+        readBitmap: suspend (Uri) -> Bitmap?,
+    ): AiAnalysisResult {
         val cloud = settings.useCloud && BuildConfig.NEXORA_API_TOKEN.isNotBlank()
         if (!cloud && !settings.hasAiKey()) {
             return AiAnalysisResult.Error("No AI provider configured. Enable Nexora Cloud in Settings, or add your own API key (OpenAI, Groq or any OpenAI-compatible provider).")
@@ -46,7 +50,7 @@ class ChartAiClient(private val settings: SettingsStore) {
         val images = request.imageUris.mapNotNull { readBitmap(it)?.let { b -> encodeForTransport(b) } }
         if (images.isEmpty()) return AiAnalysisResult.Error("Could not read the selected chart image(s).")
 
-        if (cloud) return analyzeViaCloud(request, images)
+        if (cloud) return analyzeViaCloud(request, sessionToken, images)
 
         val prompt = buildPrompt(request)
 
@@ -89,11 +93,16 @@ class ChartAiClient(private val settings: SettingsStore) {
      * runs the identical prompt server-side and returns the same JSON
      * contract ({status, analysis{signal, confidence, entry, ...}}).
      */
-    private suspend fun analyzeViaCloud(request: ChartAnalysisRequest, images: List<String>): AiAnalysisResult =
+    private suspend fun analyzeViaCloud(
+        request: ChartAnalysisRequest,
+        sessionToken: String,
+        images: List<String>,
+    ): AiAnalysisResult =
         withContext(Dispatchers.IO) {
             try {
                 val body = JsonObject().apply {
                     addProperty("token", BuildConfig.NEXORA_API_TOKEN)
+                    if (sessionToken.isNotBlank()) addProperty("sessionToken", sessionToken)
                     add("images", JsonArray().apply { images.forEach { add(com.google.gson.JsonPrimitive(it)) } })
                     addProperty("timeframe", request.timeframe)
                     addProperty("trading_style", request.tradingStyle)

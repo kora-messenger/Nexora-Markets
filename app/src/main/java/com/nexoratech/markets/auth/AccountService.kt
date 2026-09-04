@@ -28,9 +28,62 @@ class AccountService {
 
     sealed class AccountResult {
         /** [token] is the freshly issued session (null when merely validating). */
-        data class Success(val user: AccountUser, val token: String? = null) : AccountResult()
+        data class Success(
+            val user: AccountUser,
+            val token: String? = null,
+            val access: AccessStateData? = null,
+        ) : AccountResult()
         data class Failure(val message: String) : AccountResult()
     }
+
+    /** Trial/subscription state straight from the backend. */
+    data class AccessStateData(val mode: String, val daysLeft: Int?, val endsAt: String?) {
+        val isExpired: Boolean get() = mode == "expired"
+        val isActive: Boolean get() = mode == "active"
+    }
+
+    sealed class AccessResult {
+        data class Loaded(val access: AccessStateData) : AccessResult()
+        data class Failure(val message: String) : AccessResult()
+    }
+
+    sealed class SubscribeResult {
+        data class Requested(val state: String) : SubscribeResult()
+        data class Failure(val message: String) : SubscribeResult()
+    }
+
+    /** Refresh the trial/subscription state on demand (paywall decisions). */
+    suspend fun getAccessState(sessionToken: String): AccessResult {
+        val payload = buildBody { addProperty("sessionToken", sessionToken) }
+        val response = postJson("getAccessState", payload)
+            ?: return AccessResult.Failure("No connection to Nexora Cloud")
+        return if (response.get("status")?.asString == "ok") {
+            AccessResult.Loaded(parseAccess(response.getAsJsonObject("access")))
+        } else {
+            AccessResult.Failure(response.get("message")?.asString ?: "Could not read access state")
+        }
+    }
+
+    /** Ask to be switched to Pro once the trial ends (idempotent server-side). */
+    suspend fun requestSubscription(sessionToken: String): SubscribeResult {
+        val payload = buildBody { addProperty("sessionToken", sessionToken) }
+        val response = postJson("requestSubscription", payload)
+            ?: return SubscribeResult.Failure("No connection to Nexora Cloud")
+        return if (response.get("status")?.asString == "ok") {
+            SubscribeResult.Requested(
+                response.getAsJsonObject("request")?.get("state")?.asString ?: "pending"
+            )
+        } else {
+            SubscribeResult.Failure(response.get("message")?.asString ?: "Could not request Pro access")
+        }
+    }
+
+    private fun parseAccess(json: JsonObject?): AccessStateData =
+        AccessStateData(
+            mode = json?.get("mode")?.takeIf { !it.isJsonNull }?.asString ?: "trial",
+            daysLeft = json?.get("daysLeft")?.takeIf { !it.isJsonNull }?.asInt,
+            endsAt = json?.get("endsAt")?.takeIf { !it.isJsonNull }?.asString,
+        )
 
     suspend fun register(displayName: String, email: String, password: String): AccountResult =
         callAuth(
@@ -94,6 +147,7 @@ class AccountService {
                                 displayName = user.get("displayName")?.asString.orEmpty(),
                             ),
                             token = session?.get("token")?.takeIf { !it.isJsonNull }?.asString,
+                            access = parseAccess(json.getAsJsonObject("access")),
                         )
                     } else {
                         AccountResult.Failure(

@@ -170,7 +170,8 @@ fun AnalyzeScreen(app: NexoraApp, onBack: () -> Unit) {
                     scope.launch {
                         busy = true
                         result = app.aiClient.analyze(
-                            ChartAnalysisRequest(images, timeframe, style, instrument)
+                            ChartAnalysisRequest(images, timeframe, style, instrument),
+                            app.accountStore.sessionToken,
                         ) { uri -> ChartAiClient.decodeUri(app, uri) }
                         busy = false
                     }

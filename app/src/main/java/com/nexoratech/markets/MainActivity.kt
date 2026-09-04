@@ -27,6 +27,8 @@ import com.nexoratech.markets.ui.screens.CreateAccountScreen
 import com.nexoratech.markets.ui.screens.LoginScreen
 import com.nexoratech.markets.ui.screens.ProfileOnboardingScreen
 import com.nexoratech.markets.ui.screens.MarketsScreen
+import com.nexoratech.markets.ui.screens.PayoffScreen
+import com.nexoratech.markets.ui.screens.PaywallScreen
 import com.nexoratech.markets.ui.screens.SettingsScreen
 import com.nexoratech.markets.ui.screens.SignalDetailScreen
 import com.nexoratech.markets.ui.screens.WelcomeScreen
@@ -53,6 +55,7 @@ private fun NexoraApp(app: NexoraApp) {
     val viewModel: MarketsViewModel = viewModel(factory = MarketsViewModel.Factory(app))
     val authState by account.state.collectAsState()
     val profileComplete by account.profileComplete.collectAsState()
+    val access by account.access.collectAsState()
 
     when (val s = authState) {
         is AccountViewModel.AuthState.CheckingSession -> {
@@ -87,27 +90,46 @@ private fun NexoraApp(app: NexoraApp) {
                 }
             }
         }
-        is AccountViewModel.AuthState.SignedIn -> when (profileComplete) {
+        is AccountViewModel.AuthState.SignedIn -> when {
             // Still resolving the profile — keep the boot spinner up.
-            null -> {
+            profileComplete == null -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Teal400, strokeWidth = 2.5.dp)
                 }
             }
             // Questionnaire pending — the only way forward is through it.
-            false -> {
+            profileComplete == false -> {
                 NavHost(navController = navController, startDestination = "onboarding") {
                     composable("onboarding") {
                         ProfileOnboardingScreen(
                             viewModel = account,
                             onDone = {
-                                navController.navigate("markets") {
+                                navController.navigate("payoff") {
                                     popUpTo("onboarding") { inclusive = true }
                                 }
                             },
                         )
                     }
+                    composable("payoff") {
+                        PayoffScreen(
+                            viewModel = account,
+                            onEnterMarkets = {
+                                navController.navigate("markets") {
+                                    popUpTo("payoff") { inclusive = true }
+                                }
+                            },
+                        )
+                    }
                 }
+            }
+            // Trial ended and no active subscription — the app is the paywall.
+            profileComplete == true && access?.isExpired == true -> {
+                PaywallScreen(
+                    viewModel = account,
+                    onSignOut = {
+                        account.signOut { navController.navigate("welcome") { popUpTo(0) } }
+                    },
+                )
             }
             else -> NavHost(navController = navController, startDestination = "markets") {
                 composable("markets") {
