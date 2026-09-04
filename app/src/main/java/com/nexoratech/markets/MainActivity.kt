@@ -25,6 +25,7 @@ import com.nexoratech.markets.ui.MarketsViewModel
 import com.nexoratech.markets.ui.screens.AnalyzeScreen
 import com.nexoratech.markets.ui.screens.CreateAccountScreen
 import com.nexoratech.markets.ui.screens.LoginScreen
+import com.nexoratech.markets.ui.screens.ProfileOnboardingScreen
 import com.nexoratech.markets.ui.screens.MarketsScreen
 import com.nexoratech.markets.ui.screens.SettingsScreen
 import com.nexoratech.markets.ui.screens.SignalDetailScreen
@@ -51,6 +52,7 @@ private fun NexoraApp(app: NexoraApp) {
     val account: AccountViewModel = viewModel(factory = AccountViewModel.Factory(app))
     val viewModel: MarketsViewModel = viewModel(factory = MarketsViewModel.Factory(app))
     val authState by account.state.collectAsState()
+    val profileComplete by account.profileComplete.collectAsState()
 
     when (val s = authState) {
         is AccountViewModel.AuthState.CheckingSession -> {
@@ -85,8 +87,29 @@ private fun NexoraApp(app: NexoraApp) {
                 }
             }
         }
-        is AccountViewModel.AuthState.SignedIn -> {
-            NavHost(navController = navController, startDestination = "markets") {
+        is AccountViewModel.AuthState.SignedIn -> when (profileComplete) {
+            // Still resolving the profile — keep the boot spinner up.
+            null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Teal400, strokeWidth = 2.5.dp)
+                }
+            }
+            // Questionnaire pending — the only way forward is through it.
+            false -> {
+                NavHost(navController = navController, startDestination = "onboarding") {
+                    composable("onboarding") {
+                        ProfileOnboardingScreen(
+                            viewModel = account,
+                            onDone = {
+                                navController.navigate("markets") {
+                                    popUpTo("onboarding") { inclusive = true }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+            else -> NavHost(navController = navController, startDestination = "markets") {
                 composable("markets") {
                     MarketsScreen(
                         viewModel = viewModel,
@@ -124,7 +147,18 @@ private fun NexoraApp(app: NexoraApp) {
                         viewModel = viewModel,
                         account = account,
                         user = s.user,
+                        onEditProfile = {
+                            navController.navigate("onboarding") {
+                                popUpTo("onboarding") { inclusive = true }
+                            }
+                        },
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable("onboarding") {
+                    ProfileOnboardingScreen(
+                        viewModel = account,
+                        onDone = { navController.popBackStack() },
                     )
                 }
             }

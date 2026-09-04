@@ -23,6 +23,10 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
     private val _state = MutableStateFlow<AuthState>(AuthState.CheckingSession)
     val state: StateFlow<AuthState> = _state
 
+    /** null = still checking, false = questionnaire needed, true = profile on file. */
+    private val _profileComplete = MutableStateFlow<Boolean?>(null)
+    val profileComplete: StateFlow<Boolean?> = _profileComplete
+
     init {
         restoreSession()
     }
@@ -41,6 +45,7 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
                     store.userEmail = result.user.email
                     store.userDisplayName = result.user.displayName
                     _state.value = AuthState.SignedIn(result.user)
+                    checkProfile()
                 }
                 is AccountService.AccountResult.Failure -> {
                     store.clear()
@@ -91,6 +96,48 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
             displayName = result.user.displayName,
         )
         _state.value = AuthState.SignedIn(result.user)
+        checkProfile()
+    }
+
+    private fun checkProfile() {
+        viewModelScope.launch {
+            val token = app.accountStore.sessionToken
+            when (val result = app.accountService.getProfile(token)) {
+                is AccountService.ProfileResult.Loaded ->
+                    _profileComplete.value = result.profile?.isComplete == true
+                is AccountService.ProfileResult.Failure ->
+                    // Backend unreachable: let the user through rather than
+                    // trapping them at a spinner — they can retry from Settings.
+                    _profileComplete.value = true
+            }
+        }
+    }
+
+    fun onProfileSaved() {
+        _profileComplete.value = true
+    }
+
+    fun saveProfile(
+        experienceLevel: String,
+        primaryGoal: String,
+        capitalUsd: Double,
+        instruments: String,
+        tradingStyle: String,
+        riskTolerance: String,
+        onDone: (String?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val token = app.accountStore.sessionToken
+            when (
+                val result = app.accountService.saveProfile(
+                    token, experienceLevel, primaryGoal, capitalUsd,
+                    instruments, tradingStyle, riskTolerance,
+                )
+            ) {
+                is AccountService.ProfileResult.Loaded -> onDone(null)
+                is AccountService.ProfileResult.Failure -> onDone(result.message)
+            }
+        }
     }
 
     class Factory(private val app: NexoraApp) : ViewModelProvider.Factory {

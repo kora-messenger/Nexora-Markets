@@ -108,6 +108,92 @@ class AccountService {
             }
         }
 
+
+data class TradingProfileData(
+    val experienceLevel: String? = null,
+    val primaryGoal: String? = null,
+    val capitalUsd: Double? = null,
+    val instruments: String? = null,
+    val tradingStyle: String? = null,
+    val riskTolerance: String? = null,
+) {
+    val isComplete: Boolean
+        get() = experienceLevel != null && primaryGoal != null &&
+            instruments != null && tradingStyle != null && riskTolerance != null
+}
+
+sealed class ProfileResult {
+    data class Loaded(val profile: TradingProfileData?) : ProfileResult()
+    data class Failure(val message: String) : ProfileResult()
+}
+
+/**
+ * Personalization profile — powers the post-signup questionnaire.
+ * Same session-credential contract as auth; identity always from the
+ * session token, never from client-supplied ids.
+ */
+suspend fun getProfile(sessionToken: String): ProfileResult {
+    val payload = buildBody { addProperty("sessionToken", sessionToken) }
+    val response = postJson("getTradingProfile", payload) ?: return ProfileResult.Failure("No connection to Nexora Cloud")
+    val profile = response.get("profile")?.takeIf { it.isJsonObject }?.asJsonObject
+    return ProfileResult.Loaded(profile?.let { p ->
+        TradingProfileData(
+            experienceLevel = p.stringOrNull("experienceLevel"),
+            primaryGoal = p.stringOrNull("primaryGoal"),
+            capitalUsd = p.get("capitalUsd")?.takeIf { !it.isJsonNull }?.asDouble,
+            instruments = p.stringOrNull("instruments"),
+            tradingStyle = p.stringOrNull("tradingStyle"),
+            riskTolerance = p.stringOrNull("riskTolerance"),
+        )
+    })
+}
+
+suspend fun saveProfile(
+    sessionToken: String,
+    experienceLevel: String,
+    primaryGoal: String,
+    capitalUsd: Double,
+    instruments: String,
+    tradingStyle: String,
+    riskTolerance: String,
+): ProfileResult {
+    val payload = buildBody {
+        addProperty("sessionToken", sessionToken)
+        addProperty("experienceLevel", experienceLevel)
+        addProperty("primaryGoal", primaryGoal)
+        addProperty("capitalUsd", capitalUsd)
+        addProperty("instruments", instruments)
+        addProperty("tradingStyle", tradingStyle)
+        addProperty("riskTolerance", riskTolerance)
+    }
+    val response = postJson("saveTradingProfile", payload)
+        ?: return ProfileResult.Failure("No connection to Nexora Cloud. Try again in a moment.")
+    return if (response.get("status")?.asString == "ok") {
+        ProfileResult.Loaded(null)
+    } else {
+        ProfileResult.Failure(response.get("message")?.asString ?: "Could not save your profile")
+    }
+}
+
+private fun JsonObject.stringOrNull(key: String): String? =
+    get(key)?.takeIf { !it.isJsonNull }?.asString
+
+private suspend fun postJson(path: String, payload: JsonObject): JsonObject? =
+    withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(endpoint(path))
+                .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            http.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                runCatching { JsonParser.parseString(text).asJsonObject }.getOrNull()
+            }
+        } catch (e: IOException) {
+            null
+        }
+    }
+
     private fun endpoint(path: String): String =
         BuildConfig.NEXORA_API_URL.trimEnd('/') + "/functions/" + path
 

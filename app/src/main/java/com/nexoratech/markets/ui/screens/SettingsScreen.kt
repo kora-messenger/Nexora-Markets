@@ -47,6 +47,7 @@ fun SettingsScreen(
     viewModel: MarketsViewModel,
     account: com.nexoratech.markets.auth.AccountViewModel,
     user: com.nexoratech.markets.auth.AccountUser,
+    onEditProfile: () -> Unit,
     onBack: () -> Unit,
 ) {
     var apiKey by remember { mutableStateOf(app.settings.aiApiKey) }
@@ -95,6 +96,9 @@ fun SettingsScreen(
                     Column {
                         Text(user.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                         Text(user.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = onEditProfile) {
+                        Text("Edit trading profile", color = com.nexoratech.markets.ui.theme.Teal400)
                     }
                     if (confirmSignOut) {
                         Text("Sign out on this device?", style = MaterialTheme.typography.bodyMedium)
