@@ -110,9 +110,13 @@ fun PayoffScreen(
 
         // What their answers just configured
         val defaults = listOfNotNull(
+            p?.experienceLevel?.let { "EXPERIENCE  $it" },
             p?.tradingSessions?.let { "SESSIONS  $it" },
             p?.holdDuration?.let { "MODE  $it" },
             p?.instruments?.takeIf { it.isNotBlank() }?.let { "WATCHLIST  $it" },
+            if (p?.confluenceBiasTf != null && p.confluenceTriggerTf != null) {
+                "CONFLUENCE  ${p.confluenceBiasTf} bias -> ${p.confluenceTriggerTf} trigger"
+            } else null,
         )
         if (defaults.isNotEmpty()) {
             Text(

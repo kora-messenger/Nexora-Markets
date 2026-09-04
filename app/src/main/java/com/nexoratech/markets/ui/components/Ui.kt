@@ -132,14 +132,18 @@ fun NexoraPrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     androidx.compose.material3.Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(52.dp),
         shape = RoundedCornerShape(12.dp),
         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
             containerColor = Teal400,
             contentColor = androidx.compose.ui.graphics.Color(0xFF06231F),
+            disabledContainerColor = Teal400.copy(alpha = 0.28f),
+            disabledContentColor = androidx.compose.ui.graphics.Color(0xFF06231F).copy(alpha = 0.55f),
         ),
     ) {
         Text(

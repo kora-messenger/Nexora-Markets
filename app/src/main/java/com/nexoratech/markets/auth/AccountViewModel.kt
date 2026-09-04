@@ -134,20 +134,25 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
     }
 
     fun saveProfile(
+        experienceLevel: String,
         tradingSessions: String,
         tradeFrequency: String,
         holdDuration: String,
         riskPercent: Double,
         instruments: String,
         capitalUsd: Double,
+        confluenceBiasTf: String,
+        confluenceTriggerTf: String,
+        entryNotes: String,
         onDone: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             val token = app.accountStore.sessionToken
             when (
                 val result = app.accountService.saveProfile(
-                    token, tradingSessions, tradeFrequency, holdDuration,
-                    riskPercent, instruments, capitalUsd,
+                    token, experienceLevel, tradingSessions, tradeFrequency, holdDuration,
+                    riskPercent, instruments, capitalUsd, confluenceBiasTf, confluenceTriggerTf,
+                    entryNotes,
                 )
             ) {
                 is AccountService.ProfileResult.Loaded -> onDone(null)
@@ -155,6 +160,9 @@ class AccountViewModel(private val app: NexoraApp) : ViewModel() {
             }
         }
     }
+
+    /** The trader's display name for onboarding personalization headers. */
+    val displayName: String get() = app.accountStore.userDisplayName.ifBlank { "trader" }
 
     /** Ask the backend for the freshest trial/subscription state. */
     fun refreshAccess() {

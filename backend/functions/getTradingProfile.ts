@@ -53,12 +53,16 @@ Deno.serve(async (req) => {
       status: 'ok',
       profile: record
         ? {
+            experienceLevel: record.experience_level ?? null,
             tradingSessions: record.trading_sessions ?? null,
             tradeFrequency: record.trade_frequency ?? null,
             holdDuration: record.hold_duration ?? null,
             riskPercent: record.risk_percent ?? null,
             instruments: record.instruments ?? null,
             capitalUsd: record.capital_usd ?? null,
+            confluenceBiasTf: record.confluence_bias_tf ?? null,
+            confluenceTriggerTf: record.confluence_trigger_tf ?? null,
+            entryNotes: record.entry_notes ?? null,
           }
         : null,
     });

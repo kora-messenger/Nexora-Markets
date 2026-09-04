@@ -164,16 +164,21 @@ class AccountService {
 
 
 data class TradingProfileData(
+    val experienceLevel: String? = null,
     val tradingSessions: String? = null,
     val tradeFrequency: String? = null,
     val holdDuration: String? = null,
     val riskPercent: Double? = null,
     val instruments: String? = null,
     val capitalUsd: Double? = null,
+    val confluenceBiasTf: String? = null,
+    val confluenceTriggerTf: String? = null,
+    val entryNotes: String? = null,
 ) {
     val isComplete: Boolean
-        get() = tradingSessions != null && tradeFrequency != null && holdDuration != null &&
-            riskPercent != null && instruments != null && capitalUsd != null
+        get() = experienceLevel != null && tradingSessions != null && tradeFrequency != null &&
+            holdDuration != null && riskPercent != null && instruments != null &&
+            capitalUsd != null && confluenceBiasTf != null && confluenceTriggerTf != null
 
     /** Dollar risk per trade — the number the signal engine sizes plans with. */
     val dollarRiskPerTrade: Double?
@@ -196,33 +201,45 @@ suspend fun getProfile(sessionToken: String): ProfileResult {
     val profile = response.get("profile")?.takeIf { it.isJsonObject }?.asJsonObject
     return ProfileResult.Loaded(profile?.let { p ->
         TradingProfileData(
+            experienceLevel = p.stringOrNull("experienceLevel"),
             tradingSessions = p.stringOrNull("tradingSessions"),
             tradeFrequency = p.stringOrNull("tradeFrequency"),
             holdDuration = p.stringOrNull("holdDuration"),
             riskPercent = p.get("riskPercent")?.takeIf { !it.isJsonNull }?.asDouble,
             instruments = p.stringOrNull("instruments"),
             capitalUsd = p.get("capitalUsd")?.takeIf { !it.isJsonNull }?.asDouble,
+            confluenceBiasTf = p.stringOrNull("confluenceBiasTf"),
+            confluenceTriggerTf = p.stringOrNull("confluenceTriggerTf"),
+            entryNotes = p.stringOrNull("entryNotes"),
         )
     })
 }
 
 suspend fun saveProfile(
     sessionToken: String,
+    experienceLevel: String,
     tradingSessions: String,
     tradeFrequency: String,
     holdDuration: String,
     riskPercent: Double,
     instruments: String,
     capitalUsd: Double,
+    confluenceBiasTf: String,
+    confluenceTriggerTf: String,
+    entryNotes: String,
 ): ProfileResult {
     val payload = buildBody {
         addProperty("sessionToken", sessionToken)
+        addProperty("experienceLevel", experienceLevel)
         addProperty("tradingSessions", tradingSessions)
         addProperty("tradeFrequency", tradeFrequency)
         addProperty("holdDuration", holdDuration)
         addProperty("riskPercent", riskPercent)
         addProperty("instruments", instruments)
         addProperty("capitalUsd", capitalUsd)
+        addProperty("confluenceBiasTf", confluenceBiasTf)
+        addProperty("confluenceTriggerTf", confluenceTriggerTf)
+        addProperty("entryNotes", entryNotes)
     }
     val response = postJson("saveTradingProfile", payload)
         ?: return ProfileResult.Failure("No connection to Nexora Cloud. Try again in a moment.")
